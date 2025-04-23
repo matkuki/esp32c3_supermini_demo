@@ -5,8 +5,6 @@
  * @version 0.1
  * @date 2025-04-11
  *
- * @copyright Copyright (c) 2025
- *
  */
 
 #ifndef UART_COMM_H

@@ -5,8 +5,6 @@
  * @version 0.1
  * @date 2025-04-10
  *
- * @copyright Copyright (c) 2025
- *
  */
 
 #include "i2c_chipcap2.h"

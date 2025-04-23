@@ -5,8 +5,6 @@
  * @version 0.1
  * @date 2025-04-17
  *
- * @copyright Copyright (c) 2025
- *
  */
 
 #ifndef WIFI_CONTROLLER_H
