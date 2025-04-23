@@ -1,0 +1,242 @@
+menu "Matic's Configuration"
+
+    menu "I2C Master"
+        config I2C_MASTER_SCL
+            int "SCL GPIO Num"
+            default 4
+            help
+                GPIO number for I2C Master clock line.
+
+        config I2C_MASTER_SDA
+            int "SDA GPIO Num"
+            default 5
+            help
+                GPIO number for I2C Master data line.
+
+        config I2C_MASTER_FREQUENCY
+            int "Master Frequency"
+            default 100000
+            help
+                I2C Speed of Master device.
+    endmenu
+
+    orsource "$IDF_PATH/examples/common_components/env_caps/$IDF_TARGET/Kconfig.env_caps"
+    
+    menu "BLINK LED"
+        config BLINK_GPIO
+            int "Blink GPIO number"
+            range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+            default 8
+            help
+                GPIO number (IOxx) to blink on and off the LED.
+                Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to blink.
+
+        config BLINK_PERIOD
+            int "Blink period in ms"
+            range 10 3600000
+            default 200
+            help
+                Define the blinking period in milliseconds.
+    endmenu
+
+    menu "UART RS485 COMM"
+        config ECHO_UART_PORT_NUM
+            int "UART port number"
+            range 0 2 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S3
+            default 2 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S3
+            range 0 1
+            default 1
+            help
+                UART communication port number for the example.
+                See UART documentation for available port numbers.
+    
+        config ECHO_UART_BAUD_RATE
+            int "UART communication speed"
+            range 1200 115200
+            default 115200
+            help
+                UART communication speed for Modbus example.
+    
+        config ECHO_UART_RXD
+            int "UART RXD pin number"
+            range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
+            default 20 if IDF_TARGET_ESP32
+            default 8 if !IDF_TARGET_ESP32
+            help
+                GPIO number for UART RX pin. See UART documentation for more information
+                about available pin numbers for UART.
+    
+        config ECHO_UART_TXD
+            int "UART TXD pin number"
+            range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+            default 21 if IDF_TARGET_ESP32
+            default 9 if !IDF_TARGET_ESP32
+            help
+                GPIO number for UART TX pin. See UART documentation for more information
+                about available pin numbers for UART.
+    
+        config ECHO_UART_RTS
+            int "UART RTS pin number"
+            range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+            default 10 if IDF_TARGET_ESP32
+            default 10 if !IDF_TARGET_ESP32
+            help
+                GPIO number for UART RTS pin. This pin is connected to
+                ~RE/DE pin of RS485 transceiver to switch direction.
+                See UART documentation for more information about available pin
+                numbers for UART.
+    
+        config ECHO_TASK_STACK_SIZE
+            int "UART echo RS485 example task stack size"
+            range 1024 16384
+            default 3072
+            help
+                Defines stack size for UART echo RS485 example. Insufficient stack size can cause crash.
+    
+    endmenu
+
+    menu "GPIO"
+
+        config BUTTON_INPUT
+            int "The button's GPIO input pin"
+            range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
+            default 2
+            help
+                GPIO pin number to be used as GPIO_INPUT_IO_0.
+        
+    endmenu
+
+    menu "MQTT"
+
+        config BROKER_URL
+            string "Broker URL"
+            default "mqtts://mqtt.eclipseprojects.io"
+            help
+                URL of the broker to connect to
+    
+    endmenu
+
+    menu "Provisioning Configuration"
+
+        choice EXAMPLE_PROV_TRANSPORT
+            bool "Provisioning Transport"
+            default EXAMPLE_PROV_TRANSPORT_BLE
+            help
+                Wi-Fi provisioning component offers both, SoftAP and BLE transports. Choose any one.
+    
+            config EXAMPLE_PROV_TRANSPORT_BLE
+                bool "BLE"
+                select BT_ENABLED
+                depends on !IDF_TARGET_ESP32S2
+        endchoice
+    
+        choice EXAMPLE_PROV_SECURITY_VERSION
+            bool "Protocomm security version"
+            default EXAMPLE_PROV_SECURITY_VERSION_2
+            help
+                Wi-Fi provisioning component offers 3 security versions.
+                The example offers a choice between security version 1 and 2.
+    
+            config EXAMPLE_PROV_SECURITY_VERSION_1
+                bool "Security version 1"
+                select ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1
+    
+            config EXAMPLE_PROV_SECURITY_VERSION_2
+                bool "Security version 2"
+                select ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2
+        endchoice
+    
+        choice EXAMPLE_PROV_MODE
+            bool "Security version 2 mode"
+            depends on EXAMPLE_PROV_SECURITY_VERSION_2
+            default EXAMPLE_PROV_SEC2_DEV_MODE
+    
+            config EXAMPLE_PROV_SEC2_DEV_MODE
+                bool "Security version 2 development mode"
+                depends on EXAMPLE_PROV_SECURITY_VERSION_2
+                help
+                    This enables the development mode for
+                    security version 2.
+                    Please note that this mode is NOT recommended for production purpose.
+    
+            config EXAMPLE_PROV_SEC2_PROD_MODE
+                bool "Security version 2 production mode"
+                depends on EXAMPLE_PROV_SECURITY_VERSION_2
+                help
+                    This enables the production mode for
+                    security version 2.
+        endchoice
+    
+        config EXAMPLE_PROV_TRANSPORT
+            int
+            default 1 if EXAMPLE_PROV_TRANSPORT_BLE
+            default 2 if EXAMPLE_PROV_TRANSPORT_SOFTAP
+    
+        config EXAMPLE_PROV_ENABLE_APP_CALLBACK
+            bool "Enable provisioning manager app callback"
+            default n
+            help
+                This is for advanced use-cases like modifying Wi-Fi configuration parameters. This
+                executes a blocking app callback when any provisioning event is triggered.
+    
+        config EXAMPLE_RESET_PROVISIONED
+            bool
+            default n
+            prompt "Reset provisioned status of the device"
+            help
+                This erases the NVS to reset provisioned status of the device on every reboot.
+                Provisioned status is determined by the Wi-Fi STA configuration, saved on the NVS.
+    
+        config EXAMPLE_RESET_PROV_MGR_ON_FAILURE
+            bool
+            default y
+            prompt "Reset provisioned credentials and state machine after session failure"
+            help
+                Enable resetting provisioned credentials and state machine after session failure.
+                This will restart the provisioning service after retries are exhausted.
+    
+        config EXAMPLE_PROV_MGR_CONNECTION_CNT
+            int
+            default 5
+            prompt "Max connection attempts before resetting provisioning state machine"
+            depends on EXAMPLE_RESET_PROV_MGR_ON_FAILURE
+            help
+                Set the total number of connection attempts to avoid reconnecting to an inexistent AP or if credentials
+                are misconfigured. Provisioned credentials are erased and internal state machine
+                is reset after this threshold is reached.
+    
+        config EXAMPLE_PROV_SHOW_QR
+            bool "Show provisioning QR code"
+            default y
+            help
+                Show the QR code for provisioning.
+    
+        config EXAMPLE_PROV_USING_BLUEDROID
+            bool
+            depends on (BT_BLUEDROID_ENABLED && (IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3))
+            select BT_BLE_42_FEATURES_SUPPORTED
+            default y
+            help
+                This enables BLE 4.2 features for Bluedroid.
+    
+        config EXAMPLE_REPROVISIONING
+            bool "Re-provisioning"
+            help
+                Enable re-provisioning - allow the device to provision for new credentials
+                after previous successful provisioning.
+    
+    endmenu
+
+    menu "OTA"
+
+        config EXAMPLE_FIRMWARE_UPGRADE_URL
+            string "firmware upgrade url endpoint"
+            default "https://192.168.0.3:8070/upgrade.bin"
+            help
+                URL of server which hosts the firmware
+                image.
+    
+    endmenu
+    
+
+endmenu
