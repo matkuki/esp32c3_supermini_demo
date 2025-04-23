@@ -7,6 +7,8 @@ This project uses the ESP32-C3-Supermini development board to demonstrate the va
     <img src="images/esp32_c3_supermini.png" alt="ESP32-C3-Supermini image" height="200"/>
 </div>
 
+---
+
 ## Description
 
 ### Program Operation Overview
@@ -103,8 +105,6 @@ To enter the credentials, use the official Espressif **ESP BLE Provisioning** ap
     - Connects to the Wi-Fi network
     - Blinks the blue LED **10 times** to signal success
 
----
-
 ### OTA (Over-The-Air) Update
 
 The **OTA update** mechanism allows the board to update its firmware by downloading a new `.bin` file over the network. This process is triggered by receiving a special MQTT message: **`UPDATE-FIRMWARE`**.
@@ -127,6 +127,7 @@ The **OTA update** mechanism allows the board to update its firmware by download
     - The board sets the new partition as the boot target
     - It performs a **restart**, booting into the new firmware
 
+---
 
 ## Setup
 
