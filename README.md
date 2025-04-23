@@ -114,7 +114,7 @@ The **OTA update** mechanism allows the board to update its firmware by download
 >
 > The default command is:  
 > ```
-> pytest_simple_ota.py bins 8070 components/ota_component
+> pytest_ota.py bins 8070 components/ota_component
 > ```  
 > Ensure the `bins` directory exists and contains the new firmware as `upgrade.bin`.
 
