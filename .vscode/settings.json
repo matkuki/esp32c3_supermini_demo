@@ -6,5 +6,9 @@
         "board/esp32c3-builtin.cfg"
     ],
     "idf.portWin": "COM4",
-    "idf.toolsPathWin": "C:\\Users\\matic\\.espressif"
+    "idf.toolsPathWin": "C:\\Users\\matic\\.espressif",
+    "idf.customExtraVars": {
+        "IDF_TARGET": "esp32c3"
+    },
+    "idf.flashType": "UART"
 }
