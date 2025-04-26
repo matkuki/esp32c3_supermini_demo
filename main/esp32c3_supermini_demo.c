@@ -340,6 +340,21 @@ void app_main(void) {
     gpio_controller_init(gpio_isr_handler);
     uart_comm_vsend("GPIO initialised.\r\n");
 
+    // Re-provision check
+    bool reprovision_flag = false;
+    if (gpio_controller_get_button_state() == GPIO_BUTTON_STATE_PRESSED) {
+        // Wait for two se
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        if (gpio_controller_get_button_state() == GPIO_BUTTON_STATE_PRESSED) {
+            reprovision_flag = true;
+            for (int i = 0; i < 20; i++) {
+                led_toggle();
+                vTaskDelay(50 / portTICK_PERIOD_MS);
+            }
+            uart_comm_vsend("Reprovisioning activated!\r\n");
+        }
+    }
+
     led_on();
 
     // Create general event queue
@@ -364,7 +379,7 @@ void app_main(void) {
     uart_comm_vsend("I2C initialised.\r\n");
 
     uart_comm_vsend("Initialising Wifi connection ...\r\n");
-    ESP_ERROR_CHECK(wifi_controller_connect());
+    ESP_ERROR_CHECK(wifi_controller_connect(reprovision_flag));
     uart_comm_vsend("Wifi connection initialised.\r\n");
 
     // MQTT inizialization

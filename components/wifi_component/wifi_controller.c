@@ -259,7 +259,7 @@ static void wifi_prov_print_qr(const char *name, const char *username,
              QRCODE_BASE_URL, payload);
 }
 
-esp_err_t wifi_controller_connect(void) {
+esp_err_t wifi_controller_connect(bool reprovision_override) {
     /* Initialize NVS partition */
     esp_err_t result = nvs_flash_init();
     if (result == ESP_ERR_NVS_NO_FREE_PAGES ||
@@ -324,6 +324,10 @@ esp_err_t wifi_controller_connect(void) {
 
     /* Let's find out if the device is provisioned */
     ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&provisioned));
+
+    if (reprovision_override == true) {
+        provisioned = false;
+    }
 
     /* If device is not yet provisioned start provisioning service */
     if (!provisioned) {

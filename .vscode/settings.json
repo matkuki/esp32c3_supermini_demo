@@ -14,5 +14,6 @@
     "files.associations": {
         "uart.h": "c",
         "mqtt_client.h": "c"
-    }
+    },
+    "editor.formatOnSave": true
 }

@@ -18,7 +18,7 @@ extern "C" {
  * @brief WiFi connection function with ESP provisioning support
  *
  */
-esp_err_t wifi_controller_connect(void);
+esp_err_t wifi_controller_connect(bool reprovision_override);
 
 /**
  * @brief Reprovision the Wifi connection, so that it can be provisioned over
