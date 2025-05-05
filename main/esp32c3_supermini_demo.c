@@ -42,6 +42,9 @@ bool button_hold_flag = false;
 // ChipCap2 sensor
 static i2c_chipcap2_data_t chipcap2_out_data = {0};
 
+int64_t start_time;
+int64_t end_time;
+
 /**
  * @brief GPIO interrupt service handler
  *
@@ -234,9 +237,10 @@ static void mqtt5_event_handler(void* handler_args, esp_event_base_t base,
             ESP_LOGI(TAG, "TOPIC=%.*s", event->topic_len, event->topic);
             ESP_LOGI(TAG, "DATA=%.*s", event->data_len, event->data);
 
-            if (event->data_len == 18 &&
-                strncmp(event->data, "read-and-publish\r\n", event->data_len) ==
+            if (event->data_len == 16 &&
+                strncmp(event->data, "read-and-publish", event->data_len) ==
                     0) {
+                start_time = esp_timer_get_time();
                 event_t new_event = EVENT_MESSAGE_READ_AND_PUBLISH;
                 xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
             } else if (event->data_len == 17 &&
@@ -289,7 +293,7 @@ static void read_and_publish_sensor_data(const char* message) {
     for (int i = 0; i < 2; i++) {
         result = i2c_chipcap2_read(&chipcap2_out_data);
     }
-
+    
     if (result == ESP_OK) {
         snprintf(message_buffer, sizeof(message_buffer),
                  "{'sensor-data': {'humidity': {'value': "
@@ -425,6 +429,9 @@ void app_main(void) {
                 case EVENT_MESSAGE_READ_AND_PUBLISH:
                     read_and_publish_sensor_data(
                         "[EVENT] MQTT-READ-AND-PUBLISH-RECEIVED\r\n");
+                    end_time = esp_timer_get_time();
+                    int64_t delta_us = (end_time - start_time) / 1000;
+                    uart_comm_vsend("[TIMING] %lld ms", delta_us);
                     event = EVENT_NONE;
                     break;
 
