@@ -297,7 +297,9 @@ static void read_and_publish_sensor_data(const char* message) {
     if (result == ESP_OK) {
         char* json_string = cjson_format_chipcap2_data(&chipcap2_out_data);
         mqtt_controller_publish(json_string);
+        uart_comm_vsend("ChipCap2 JSON data:\r\n");
         uart_comm_vsend(json_string);
+        uart_comm_vsend("\r\n");
         free(json_string);
     } else {
         uart_comm_vsend(
