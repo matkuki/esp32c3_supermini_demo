@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "cjson.h"
 #include "custom_data_types.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -293,7 +294,7 @@ static void read_and_publish_sensor_data(const char* message) {
     for (int i = 0; i < 2; i++) {
         result = i2c_chipcap2_read(&chipcap2_out_data);
     }
-    
+
     if (result == ESP_OK) {
         snprintf(message_buffer, sizeof(message_buffer),
                  "{'sensor-data': {'humidity': {'value': "
