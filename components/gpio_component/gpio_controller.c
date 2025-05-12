@@ -16,16 +16,25 @@
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/task.h"
 #include "led.h"
 #include "sdkconfig.h"
 
 #define BUTTON_INPUT_GPIO CONFIG_BUTTON_INPUT
 #define ESP_INTR_FLAG_DEFAULT 0
 
-void gpio_controller_init(void (*gpio_isr_handler)(void*)) {
+static QueueHandle_t* gpio_event_queue;
+
+/**
+ * @brief GPIO interrupt service handler
+ *
+ * @param arg GPIO pin number
+ */
+static void IRAM_ATTR gpio_isr_handler(void* arg) {
+    uint32_t gpio_num = (uint32_t)arg;
+    xQueueSendFromISR(*gpio_event_queue, &gpio_num, NULL);
+}
+
+void gpio_controller_init(QueueHandle_t* gpio_event_queue_reference) {
     // Configure the peripheral according to the LED type
     led_initialize();
 
@@ -45,6 +54,9 @@ void gpio_controller_init(void (*gpio_isr_handler)(void*)) {
     // hook isr handler for specific gpio pin
     gpio_isr_handler_add(BUTTON_INPUT_GPIO, gpio_isr_handler,
                          (void*)BUTTON_INPUT_GPIO);
+
+    // Initiaize GPIO queue from the main module
+    gpio_event_queue = gpio_event_queue_reference;
 }
 
 int gpio_controller_get_button_state(void) {

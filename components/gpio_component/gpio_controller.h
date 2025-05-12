@@ -7,6 +7,10 @@
  *
  */
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
 #ifndef GPIO_CONTROLLER_H
 #define GPIO_CONTROLLER_H
 
@@ -21,7 +25,7 @@ extern "C" {
  * @brief Initialize the global GPIO functionality
  *
  */
-void gpio_controller_init(void (*gpio_isr_handler)(void*));
+void gpio_controller_init(QueueHandle_t* gpio_event_queue_reference);
 
 /**
  * @brief

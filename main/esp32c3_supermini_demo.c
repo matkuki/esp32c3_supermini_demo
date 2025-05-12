@@ -46,16 +46,6 @@ int64_t start_time;
 int64_t end_time;
 
 /**
- * @brief GPIO interrupt service handler
- *
- * @param arg GPIO pin number
- */
-static void IRAM_ATTR gpio_isr_handler(void* arg) {
-    uint32_t gpio_num = (uint32_t)arg;
-    xQueueSendFromISR(gpio_event_queue, &gpio_num, NULL);
-}
-
-/**
  * @brief GPIO callback that fires when a GPIO change is detected
  *
  * @param arg
@@ -340,7 +330,7 @@ void app_main(void) {
 
     // GPIO initialization
     uart_comm_vsend("Initialising GPIO ...\r\n");
-    gpio_controller_init(gpio_isr_handler);
+    gpio_controller_init(&gpio_event_queue);
     uart_comm_vsend("GPIO initialised.\r\n");
 
     // Re-provision check
