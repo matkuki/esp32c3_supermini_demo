@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "cjson.h"
+#include "cjson_component.h"
 #include "custom_data_types.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -31,7 +31,6 @@
 
 // General
 static const char* TAG = "matic's supermini demo";
-static char message_buffer[200] = {0};
 static volatile int64_t last_isr_time = 0;
 // Queues
 static QueueHandle_t general_event_queue = NULL;
@@ -296,13 +295,10 @@ static void read_and_publish_sensor_data(const char* message) {
     }
 
     if (result == ESP_OK) {
-        snprintf(message_buffer, sizeof(message_buffer),
-                 "{'sensor-data': {'humidity': {'value': "
-                 "%.2f}}, {'temperature': {'value': %.2f}}}",
-                 chipcap2_out_data.humidity.value,
-                 chipcap2_out_data.temperature.value);
-
-        mqtt_controller_publish(message_buffer);
+        char* json_string = cjson_format_chipcap2_data(&chipcap2_out_data);
+        mqtt_controller_publish(json_string);
+        uart_comm_vsend(json_string);
+        free(json_string);
     } else {
         uart_comm_vsend(
             "[CHIPCAP2-ERROR] Something went wrong with the "
@@ -432,7 +428,7 @@ void app_main(void) {
                         "[EVENT] MQTT-READ-AND-PUBLISH-RECEIVED\r\n");
                     end_time = esp_timer_get_time();
                     int64_t delta_us = (end_time - start_time) / 1000;
-                    uart_comm_vsend("[TIMING] %lld ms", delta_us);
+                    uart_comm_vsend("[TIMING] %lld ms\r\n", delta_us);
                     event = EVENT_NONE;
                     break;
 
