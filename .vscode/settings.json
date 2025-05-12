@@ -17,7 +17,14 @@
         "cjson_component.h": "c",
         "cjson.h": "c",
         "task.h": "c",
-        "sdkconfig.h": "c"
+        "sdkconfig.h": "c",
+        "string": "c",
+        "format": "c",
+        "chrono": "c",
+        "functional": "c",
+        "text_encoding": "c",
+        "typeinfo": "c",
+        "cstdlib": "c"
     },
     "editor.formatOnSave": true
 }

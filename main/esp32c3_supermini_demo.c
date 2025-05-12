@@ -32,12 +32,14 @@
 // General
 static const char* TAG = "matic's supermini demo";
 static volatile int64_t last_isr_time = 0;
+static char message_buffer[200] = {0};
 // Queues
 static QueueHandle_t general_event_queue = NULL;
 static QueueHandle_t gpio_event_queue = NULL;
+// Mutexes
+SemaphoreHandle_t read_and_publish_mutex;
 // Timers
 TimerHandle_t read_publish_timer;
-TimerHandle_t button_hold_timer;
 bool button_hold_flag = false;
 // ChipCap2 sensor
 static i2c_chipcap2_data_t chipcap2_out_data = {0};
@@ -60,12 +62,8 @@ static void gpio_task_callback(void* arg) {
             if (now - last_isr_time > DEBOUNCE_TIME_US) {
                 last_isr_time = now;
 
-                // Reset the button hold flag, this cancels the hold, as it
-                // detected a change in the button state during the check period
-                button_hold_flag = false;
-
                 // Add a button event to the queue
-                event_t new_event = EVENT_BUTTON;
+                event_t new_event = EVENT_BUTTON_PRESS;
                 xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
             }
         }
@@ -78,21 +76,8 @@ static void gpio_task_callback(void* arg) {
  * @param xTimer Timer handle to the timer that spawned the event
  */
 static void timer_callback(TimerHandle_t xTimer) {
-    event_t new_event = EVENT_TIMER;
+    event_t new_event = EVENT_TIMER_ELAPSED;
     xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-}
-
-/**
- * @brief Callback that fires when the timer elapses
- *
- * @param xTimer Timer handle to the timer that spawned the event
- */
-static void button_check_callback(TimerHandle_t xTimer) {
-    if ((gpio_controller_get_button_state() == GPIO_BUTTON_STATE_PRESSED) &&
-        (button_hold_flag == true)) {
-        event_t new_event = EVENT_BUTTON_HOLD;
-        xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-    }
 }
 
 /**
@@ -116,33 +101,6 @@ void timers_init(void) {
         }
     } else {
         uart_comm_vsend("Failed to create read&publish timer!\r\n");
-    }
-
-    // Create a software timer for checking a button hold (one_shot)
-    button_hold_timer =
-        xTimerCreate("ButtonHoldTimer",     // Timer name (for debugging)
-                     pdMS_TO_TICKS(2000),   // Timer period in ticks (2000 ms)
-                     pdTRUE,                // Auto-reload (true = periodic)
-                     NULL,                  // Optional timer ID
-                     button_check_callback  // Callback function
-        );
-    if (read_publish_timer == NULL) {
-        uart_comm_vsend("Failed to create button-hold timer!\r\n");
-    }
-}
-
-// Start the timer (anywhere you want)
-void timer_button_hold_start() {
-    if (xTimerStart(button_hold_timer, 0) != pdPASS) {
-        uart_comm_vsend("Failed to start button-hold timer!\n");
-    }
-    button_hold_flag = true;
-}
-
-// Stop/cancel the timer
-void timer_button_hold_stop() {
-    if (xTimerStop(button_hold_timer, 0) != pdPASS) {
-        uart_comm_vsend("Failed to stop button-hold timer!\r\n");
     }
 }
 
@@ -275,30 +233,36 @@ static void mqtt5_event_handler(void* handler_args, esp_event_base_t base,
  * published
  */
 static void read_and_publish_sensor_data(const char* message) {
-    led_toggle();
-    esp_err_t result = ESP_OK;
+    if (xSemaphoreTake(read_and_publish_mutex, portMAX_DELAY) == pdTRUE) {
+        led_toggle();
+        esp_err_t result = ESP_OK;
 
-    // Two read's are needed, the first one doesn't retrieve the humidity data
-    // correctly!
-    for (int i = 0; i < 2; i++) {
-        result = i2c_chipcap2_read(&chipcap2_out_data);
+        // Two read's are needed, the first one doesn't retrieve the humidity
+        // data correctly!
+        for (int i = 0; i < 2; i++) {
+            result = i2c_chipcap2_read(&chipcap2_out_data);
+        }
+
+        if (result == ESP_OK) {
+            result = cjson_format_chipcap2_data_prebuffered(
+                &chipcap2_out_data, message_buffer, 200);
+            if (result == ESP_OK) {
+                mqtt_controller_publish(message_buffer);
+                uart_comm_vsend("ChipCap2 JSON data:\r\n");
+                uart_comm_vsend(message_buffer);
+                uart_comm_vsend("\r\n");
+            }
+        } else {
+            uart_comm_vsend(
+                "[CHIPCAP2-ERROR] Something went wrong with the "
+                "measurement!\r\n");
+            return;
+        }
+
+        uart_comm_vsend(message);
+
+        xSemaphoreGive(read_and_publish_mutex);
     }
-
-    if (result == ESP_OK) {
-        char* json_string = cjson_format_chipcap2_data(&chipcap2_out_data);
-        mqtt_controller_publish(json_string);
-        uart_comm_vsend("ChipCap2 JSON data:\r\n");
-        uart_comm_vsend(json_string);
-        uart_comm_vsend("\r\n");
-        free(json_string);
-    } else {
-        uart_comm_vsend(
-            "[CHIPCAP2-ERROR] Something went wrong with the "
-            "measurement!\r\n");
-        return;
-    }
-
-    uart_comm_vsend(message);
 }
 
 /**
@@ -385,6 +349,13 @@ void app_main(void) {
     // Start gpio task
     xTaskCreate(gpio_task_callback, "gpio_task_callback", 2048, NULL, 10, NULL);
 
+    // Initialize mutexes
+    read_and_publish_mutex = xSemaphoreCreateMutex();
+    if (read_and_publish_mutex == NULL) {
+        uart_comm_vsend("Error initializing mutexes!\r\n");
+        return;
+    }
+
     led_off();
 
     // Visual signal for initialization completion
@@ -399,11 +370,8 @@ void app_main(void) {
         if (xQueueReceive(general_event_queue, &event, portMAX_DELAY) ==
             pdPASS) {
             switch (event) {
-                case EVENT_BUTTON:
-                    // Start the timer to detect a button press-and-hold
-                    timer_button_hold_start();
-
-                    read_and_publish_sensor_data("[EVENT] BUTTON-CLICKED\r\n");
+                case EVENT_BUTTON_PRESS:
+                    read_and_publish_sensor_data("[EVENT] BUTTON-PRESSED\r\n");
                     event = EVENT_NONE;
                     break;
 
@@ -431,7 +399,7 @@ void app_main(void) {
                     event = EVENT_NONE;
                     break;
 
-                case EVENT_TIMER:
+                case EVENT_TIMER_ELAPSED:
                     read_and_publish_sensor_data("[EVENT] TIMER-ELAPSED\r\n");
                     event = EVENT_NONE;
                     break;
