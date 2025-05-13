@@ -192,5 +192,10 @@ idf.py menuconfig
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;When the board is started in this mode, `Visual Studio Code` opens a terminal that communicates with the board through its primary **COM** port (over the **USB** cable), displaying information and error messages in the terminal.
 
+---
 
+## Dependencies
 
+This project uses the following external libraries:
+
+- [cJSON](https://github.com/DaveGamble/cJSON) – Minimalist C library for generating and parsing JSON data
