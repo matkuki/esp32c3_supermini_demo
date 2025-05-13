@@ -24,7 +24,8 @@
         "functional": "c",
         "text_encoding": "c",
         "typeinfo": "c",
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "mqtt_controller.h": "c"
     },
     "editor.formatOnSave": true
 }

@@ -27,6 +27,10 @@
 #include "uart_comm.h"
 #include "wifi_controller.h"
 
+// Functionality enabling/disabling macros
+#define MQTT_ENABLED 0
+
+// Constants
 #define DEBOUNCE_TIME_US 300000  // 300ms
 
 // General
@@ -104,6 +108,7 @@ void timers_init(void) {
     }
 }
 
+#if MQTT_ENABLED == 1
 /**
  * @brief Event handler registered to receive MQTT events
  *
@@ -224,6 +229,7 @@ static void mqtt5_event_handler(void* handler_args, esp_event_base_t base,
             break;
     }
 }
+#endif
 
 /**
  * @brief Reads ChipCap2 sensor data through I2C and publishes it to the MQTT
@@ -247,7 +253,11 @@ static void read_and_publish_sensor_data(const char* message) {
             result = cjson_format_chipcap2_data_prebuffered(
                 &chipcap2_out_data, message_buffer, 200);
             if (result == ESP_OK) {
+#if MQTT_ENABLED == 1
                 mqtt_controller_publish(message_buffer);
+#else
+                uart_comm_vsend("MQTT not enabled, skipping publishing.\r\n");
+#endif
                 uart_comm_vsend("ChipCap2 JSON data:\r\n");
                 uart_comm_vsend(message_buffer);
                 uart_comm_vsend("\r\n");
@@ -339,10 +349,14 @@ void app_main(void) {
     ESP_ERROR_CHECK(wifi_controller_connect(reprovision_flag));
     uart_comm_vsend("Wifi connection initialised.\r\n");
 
-    // MQTT inizialization
+// MQTT inizialization
+#if MQTT_ENABLED == 1
     uart_comm_vsend("Initialising MQTT ...\r\n");
     ESP_ERROR_CHECK(mqtt_controller_init(mqtt5_event_handler));
     uart_comm_vsend("MQTT initialised.\r\n");
+#else
+    uart_comm_vsend("MQTT not enabled, skipping initialization.\r\n");
+#endif
 
     timers_init();
 
@@ -410,10 +424,16 @@ void app_main(void) {
                     break;
 
                 case EVENT_MQTT_DISCONNECTED:
+#if MQTT_ENABLED == 1
                     uart_comm_vsend("[EVENT] MQTT-DISCONNECTED\r\n");
-                    uart_comm_vsend("Re-nitialising MQTT ...\r\n");
+                    uart_comm_vsend("Re-initialising MQTT ...\r\n");
                     ESP_ERROR_CHECK(mqtt_controller_init(mqtt5_event_handler));
                     uart_comm_vsend("MQTT re-initialised.\r\n");
+#else
+                    uart_comm_vsend(
+                        "MQTT not enabled, skipping re-initialization.\r\n");
+#endif
+
                     blink(5);
                     event = EVENT_NONE;
                     break;
