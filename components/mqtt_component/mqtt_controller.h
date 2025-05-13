@@ -28,7 +28,7 @@ extern "C" {
  * @brief Initiazize MQTT client (and also the WiFi connection)
  *
  */
-esp_err_t mqtt_controller_init(mqtt5_event_handler_t mqtt5_event_handler);
+esp_err_t mqtt_controller_init(QueueHandle_t *general_event_queue);
 void log_error_if_nonzero(const char *message, int error_code);
 void print_user_property(mqtt5_user_property_handle_t user_property);
 

@@ -32,6 +32,8 @@ typedef enum {
     EVENT_BUTTON_HOLD
 } event_t;
 
+extern int64_t start_time;
+
 #ifdef __cplusplus
 }
 #endif

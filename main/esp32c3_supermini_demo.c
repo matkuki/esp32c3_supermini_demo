@@ -28,7 +28,7 @@
 #include "wifi_controller.h"
 
 // Functionality enabling/disabling macros
-#define MQTT_ENABLED 0
+#define MQTT_ENABLED 1
 
 // General
 static const char* TAG = "matic's supermini demo";
@@ -43,8 +43,8 @@ bool button_hold_flag = false;
 // ChipCap2 sensor
 static i2c_chipcap2_data_t chipcap2_out_data = {0};
 
-int64_t start_time;
-int64_t end_time;
+int64_t start_time = 0;
+int64_t end_time = 0;
 
 /**
  * @brief Callback that fires when the timer elapses
@@ -79,129 +79,6 @@ void timers_init(void) {
         uart_comm_vsend("Failed to create read&publish timer!\r\n");
     }
 }
-
-#if MQTT_ENABLED == 1
-/**
- * @brief Event handler registered to receive MQTT events
- *
- *  This function is called by the MQTT client event loop.
- *
- * @param handler_args user data registered to the event.
- * @param base Event base for the handler(always MQTT Base in this example).
- * @param event_id The id for the received event.
- * @param event_data The data for the event, esp_mqtt_event_handle_t.
- */
-static void mqtt5_event_handler(void* handler_args, esp_event_base_t base,
-                                int32_t event_id, void* event_data) {
-    ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32,
-             base, event_id);
-    esp_mqtt_event_handle_t event = event_data;
-    esp_mqtt_client_handle_t client = event->client;
-
-    event_t new_event;
-
-    ESP_LOGD(TAG, "free heap size is %" PRIu32 ", minimum %" PRIu32,
-             esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-    switch ((esp_mqtt_event_id_t)event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-
-            // Send a connection message to the general queue
-            new_event = EVENT_MQTT_CONNECTED;
-            xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-
-            // Subscribe to the default topic to receive data
-            esp_mqtt_client_subscribe(client, DEFAULT_TOPIC, 1);
-            break;
-
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-
-            // Send a disconnection message to the general queue
-            new_event = EVENT_MQTT_DISCONNECTED;
-            xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-
-            break;
-
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            esp_mqtt5_client_set_user_property(
-                &disconnect_property.user_property, user_property_arr,
-                user_property_arr_size);
-            esp_mqtt5_client_set_disconnect_property(client,
-                                                     &disconnect_property);
-            esp_mqtt5_client_delete_user_property(
-                disconnect_property.user_property);
-            disconnect_property.user_property = NULL;
-            esp_mqtt_client_disconnect(client);
-            break;
-
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            print_user_property(event->property->user_property);
-            break;
-
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            print_user_property(event->property->user_property);
-            ESP_LOGI(TAG, "payload_format_indicator is %d",
-                     event->property->payload_format_indicator);
-            ESP_LOGI(TAG, "response_topic is %.*s",
-                     event->property->response_topic_len,
-                     event->property->response_topic);
-            ESP_LOGI(TAG, "correlation_data is %.*s",
-                     event->property->correlation_data_len,
-                     event->property->correlation_data);
-            ESP_LOGI(TAG, "content_type is %.*s",
-                     event->property->content_type_len,
-                     event->property->content_type);
-            ESP_LOGI(TAG, "TOPIC=%.*s", event->topic_len, event->topic);
-            ESP_LOGI(TAG, "DATA=%.*s", event->data_len, event->data);
-
-            if (event->data_len == 16 &&
-                strncmp(event->data, "read-and-publish", event->data_len) ==
-                    0) {
-                start_time = esp_timer_get_time();
-                event_t new_event = EVENT_MESSAGE_READ_AND_PUBLISH;
-                xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-            } else if (event->data_len == 17 &&
-                       strncmp(event->data, "update-firmware\r\n",
-                               event->data_len) == 0) {
-                event_t new_event = EVENT_MESSAGE_UPDATE_FIRMWARE;
-                xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-            }
-            break;
-
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-            print_user_property(event->property->user_property);
-            ESP_LOGI(TAG, "MQTT5 return code is %d",
-                     event->error_handle->connect_return_code);
-            if (event->error_handle->error_type ==
-                MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-                log_error_if_nonzero("reported from esp-tls",
-                                     event->error_handle->esp_tls_last_esp_err);
-                log_error_if_nonzero("reported from tls stack",
-                                     event->error_handle->esp_tls_stack_err);
-                log_error_if_nonzero(
-                    "captured as transport's socket errno",
-                    event->error_handle->esp_transport_sock_errno);
-                ESP_LOGI(
-                    TAG, "Last errno string (%s)",
-                    strerror(event->error_handle->esp_transport_sock_errno));
-            }
-            break;
-
-        default:
-            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
-            break;
-    }
-}
-#endif
 
 /**
  * @brief Reads ChipCap2 sensor data through I2C and publishes it to the MQTT
@@ -317,7 +194,7 @@ void app_main(void) {
 // MQTT inizialization
 #if MQTT_ENABLED == 1
     uart_comm_vsend("Initialising MQTT ...\r\n");
-    ESP_ERROR_CHECK(mqtt_controller_init(mqtt5_event_handler));
+    ESP_ERROR_CHECK(mqtt_controller_init(&general_event_queue));
     uart_comm_vsend("MQTT initialised.\r\n");
 #else
     uart_comm_vsend("MQTT not enabled, skipping initialization.\r\n");
@@ -389,7 +266,7 @@ void app_main(void) {
 #if MQTT_ENABLED == 1
                     uart_comm_vsend("[EVENT] MQTT-DISCONNECTED\r\n");
                     uart_comm_vsend("Re-initialising MQTT ...\r\n");
-                    ESP_ERROR_CHECK(mqtt_controller_init(mqtt5_event_handler));
+                    ESP_ERROR_CHECK(mqtt_controller_init(&general_event_queue));
                     uart_comm_vsend("MQTT re-initialised.\r\n");
 #else
                     uart_comm_vsend(

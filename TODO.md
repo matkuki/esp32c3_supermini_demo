@@ -1,4 +1,4 @@
 - [x] ~~Add `cJSON` library and use it for generating ChipCap2 JSON data~~
 - [x] ~~Add `cJSON` library dependency information into README and add it's license file~~
 - [x] ~~Explore button `hold` functionality without the use of `FreeRTOS` timers~~
-- [ ] Put MQTT callback into the MQTT module and pass events to the general queue by reference
+- [x] ~~Put MQTT callback into the MQTT module and pass events to the general queue by reference~~
