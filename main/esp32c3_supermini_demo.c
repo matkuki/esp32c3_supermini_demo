@@ -393,7 +393,8 @@ void app_main(void) {
                     uart_comm_vsend("MQTT re-initialised.\r\n");
 #else
                     uart_comm_vsend(
-                        "MQTT not enabled, skipping re-initialization.\r\n");
+                        "[EVENT] MQTT not enabled, skipping "
+                        "re-initialization.\r\n");
 #endif
 
                     blink(5);

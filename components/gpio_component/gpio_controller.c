@@ -24,44 +24,79 @@
 // Constants
 #define BUTTON_INPUT_GPIO CONFIG_BUTTON_INPUT
 #define ESP_INTR_FLAG_DEFAULT 0
-#define DEBOUNCE_TIME_US 300000  // 300ms
+#define BUTTON_DEBOUNCE_TIME_MS 50  // 300ms
+#define BUTTON_HOLD_TIME_MS 2000    // 2 seconds hold time
 
 static const char* TAG = "MQTT-Controller";
 static volatile int64_t last_isr_time = 0;
 static QueueHandle_t gpio_event_queue = NULL;
 static QueueHandle_t* general_event_queue_reference;
 
-/**
- * @brief GPIO interrupt service handler
- *
- * @param arg GPIO pin number
- */
-static void IRAM_ATTR gpio_isr_handler(void* arg) {
-    uint32_t gpio_num = (uint32_t)arg;
-    xQueueSendFromISR(gpio_event_queue, &gpio_num, NULL);
-}
+// Button states
+typedef enum { BUTTON_IDLE, BUTTON_PRESSED, BUTTON_HELD } button_state_t;
 
-/**
- * @brief GPIO callback that fires when a GPIO change is detected
- *
- * @param arg
- */
-static void gpio_task_callback(void* arg) {
-    uint32_t io_num;
+static void gpio_controller_button_task(void* pvParameter) {
+    button_state_t button_state = BUTTON_IDLE;
+    bool press_flag = false;
+    int64_t press_start_time = 0;
+
     while (1) {
-        if (xQueueReceive(gpio_event_queue, &io_num, portMAX_DELAY)) {
-            // Current time in microseconds
-            int64_t now = esp_timer_get_time();
+        // Read button state (assuming active low)
+        bool button_pressed = (gpio_controller_get_button_state() == 0);
 
-            if (now - last_isr_time > DEBOUNCE_TIME_US) {
-                last_isr_time = now;
+        switch (button_state) {
+            case BUTTON_IDLE:
+                if (button_pressed) {
+                    press_start_time = esp_timer_get_time();
+                    button_state = BUTTON_PRESSED;
+                }
 
-                // Add a button event to the queue
-                event_t new_event = EVENT_BUTTON_PRESS;
-                xQueueSend(*general_event_queue_reference, &new_event,
-                           portMAX_DELAY);
-            }
+                press_flag = false;
+                break;
+
+            case BUTTON_PRESSED:
+                if (!button_pressed) {
+                    // Button released before hold time
+                    button_state = BUTTON_IDLE;
+
+                    if (press_flag) {
+                        // Add a button press event to the queue
+                        event_t new_event = EVENT_BUTTON_PRESS;
+                        xQueueSend(*general_event_queue_reference, &new_event,
+                                   portMAX_DELAY);
+                    }
+                    press_flag = false;
+                } else {
+                    // Check if hold time has elapsed
+                    int64_t elapsed_time =
+                        (esp_timer_get_time() - press_start_time) /
+                        1000;  // Convert to ms
+                    if (elapsed_time >= BUTTON_DEBOUNCE_TIME_MS) {
+                        press_flag = true;
+
+                        if (elapsed_time >= BUTTON_HOLD_TIME_MS) {
+                            press_flag = false;
+                            button_state = BUTTON_HELD;
+
+                            // Add a button hold event to the queue
+                            event_t new_event = EVENT_BUTTON_HOLD;
+                            xQueueSend(*general_event_queue_reference,
+                                       &new_event, portMAX_DELAY);
+                        }
+                    }
+                }
+                break;
+
+            case BUTTON_HELD:
+                if (!button_pressed) {
+                    // Button released after being held
+                    button_state = BUTTON_IDLE;
+                }
+                break;
         }
+
+        // Small delay to prevent CPU hogging
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -79,13 +114,7 @@ void gpio_controller_init(QueueHandle_t* general_event_queue) {
     };
     gpio_config(&io_conf);
 
-    // install gpio isr service
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-
-    // hook isr handler for specific gpio pin
-    gpio_isr_handler_add(BUTTON_INPUT_GPIO, gpio_isr_handler,
-                         (void*)BUTTON_INPUT_GPIO);
-
+    // Initialize reference to the main module's general queue
     general_event_queue_reference = general_event_queue;
 
     // Create a queue to handle gpio event from isr
@@ -96,7 +125,8 @@ void gpio_controller_init(QueueHandle_t* general_event_queue) {
     }
 
     // Start gpio task
-    xTaskCreate(gpio_task_callback, "gpio_task_callback", 2048, NULL, 10, NULL);
+    xTaskCreate(gpio_controller_button_task, "gpio_controller_button_task",
+                2048, NULL, 10, NULL);
 }
 
 int gpio_controller_get_button_state(void) {
