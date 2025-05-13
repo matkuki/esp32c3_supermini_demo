@@ -25,7 +25,8 @@
         "text_encoding": "c",
         "typeinfo": "c",
         "cstdlib": "c",
-        "mqtt_controller.h": "c"
+        "mqtt_controller.h": "c",
+        "custom_data_types.h": "c"
     },
     "editor.formatOnSave": true
 }

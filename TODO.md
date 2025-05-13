@@ -1,0 +1,3 @@
+- [ ] Add `cJSON` library dependency information into README
+- [ ] Explore button `hold` functionality without the use of `FreeRTOS` timers
+- [ ] Put MQTT callback into the MQTT module and pass events to the general queue by reference

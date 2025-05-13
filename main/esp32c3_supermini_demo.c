@@ -30,16 +30,11 @@
 // Functionality enabling/disabling macros
 #define MQTT_ENABLED 0
 
-// Constants
-#define DEBOUNCE_TIME_US 300000  // 300ms
-
 // General
 static const char* TAG = "matic's supermini demo";
-static volatile int64_t last_isr_time = 0;
 static char message_buffer[200] = {0};
 // Queues
 static QueueHandle_t general_event_queue = NULL;
-static QueueHandle_t gpio_event_queue = NULL;
 // Mutexes
 SemaphoreHandle_t read_and_publish_mutex;
 // Timers
@@ -50,29 +45,6 @@ static i2c_chipcap2_data_t chipcap2_out_data = {0};
 
 int64_t start_time;
 int64_t end_time;
-
-/**
- * @brief GPIO callback that fires when a GPIO change is detected
- *
- * @param arg
- */
-static void gpio_task_callback(void* arg) {
-    uint32_t io_num;
-    while (1) {
-        if (xQueueReceive(gpio_event_queue, &io_num, portMAX_DELAY)) {
-            // Current time in microseconds
-            int64_t now = esp_timer_get_time();
-
-            if (now - last_isr_time > DEBOUNCE_TIME_US) {
-                last_isr_time = now;
-
-                // Add a button event to the queue
-                event_t new_event = EVENT_BUTTON_PRESS;
-                xQueueSend(general_event_queue, &new_event, portMAX_DELAY);
-            }
-        }
-    }
-}
 
 /**
  * @brief Callback that fires when the timer elapses
@@ -304,7 +276,7 @@ void app_main(void) {
 
     // GPIO initialization
     uart_comm_vsend("Initialising GPIO ...\r\n");
-    gpio_controller_init(&gpio_event_queue);
+    gpio_controller_init(&general_event_queue);
     uart_comm_vsend("GPIO initialised.\r\n");
 
     // Re-provision check
@@ -331,13 +303,6 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to create general queue.\n");
         return;
     }
-
-    // Create a queue to handle gpio event from isr
-    gpio_event_queue = xQueueCreate(10, sizeof(uint32_t));
-    if (gpio_event_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create GPIO queue.\n");
-        return;
-    }
     uart_comm_vsend("Queues initialised.\r\n");
 
     // I2C initialization
@@ -359,9 +324,6 @@ void app_main(void) {
 #endif
 
     timers_init();
-
-    // Start gpio task
-    xTaskCreate(gpio_task_callback, "gpio_task_callback", 2048, NULL, 10, NULL);
 
     // Initialize mutexes
     read_and_publish_mutex = xSemaphoreCreateMutex();

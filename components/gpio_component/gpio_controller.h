@@ -25,7 +25,7 @@ extern "C" {
  * @brief Initialize the global GPIO functionality
  *
  */
-void gpio_controller_init(QueueHandle_t* gpio_event_queue_reference);
+void gpio_controller_init(QueueHandle_t* general_event_queue);
 
 /**
  * @brief
